@@ -1,0 +1,18 @@
+version: '3.9'
+services:
+  backend:
+    environment:
+      DEBUG: 'False'
+    restart: unless-stopped
+
+  celery-worker:
+    restart: unless-stopped
+
+  celery-beat:
+    restart: unless-stopped
+
+  frontend:
+    command: npm run build
+
+  nginx:
+    restart: unless-stopped
