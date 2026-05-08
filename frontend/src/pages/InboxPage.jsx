@@ -16,6 +16,7 @@ export default function InboxPage() {
   const { entries, currentEntry, folder, loading, unreadCount, searchResults } = useSelector((state) => state.mail);
   const [isComposeOpen, setIsComposeOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const { isConnected } = useWebSocket(accessToken);
 
   useEffect(() => {
@@ -33,6 +34,7 @@ export default function InboxPage() {
   const handleSelectFolder = (nextFolder) => {
     if (nextFolder === 'LABELS') return;
     dispatch(fetchFolderThunk(nextFolder));
+    setSidebarOpen(false);
   };
 
   const handleSelectEntry = (entry) => {
@@ -51,17 +53,56 @@ export default function InboxPage() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-100 px-4 py-6 lg:px-8">
-      <div className="mx-auto flex max-w-7xl flex-col gap-6">
-        <Navbar user={user} isConnected={isConnected} onSearch={setSearchTerm} />
-        <div className="grid gap-6 lg:grid-cols-[280px_minmax(0,1fr)_minmax(0,1.2fr)]">
-          <Sidebar currentFolder={folder} unreadCount={unreadCount} onSelect={handleSelectFolder} onCompose={() => setIsComposeOpen(true)} />
-          <section className="space-y-4">
-            {loading ? <LoadingSpinner label="Loading mail" /> : <MailList entries={visibleEntries} currentEntry={currentEntry} onSelect={handleSelectEntry} />}
+    <div className="relative min-h-screen bg-navy-950">
+      {/* Subtle background glow */}
+      <div className="pointer-events-none fixed inset-0 z-0">
+        <div className="absolute -top-40 -right-40 h-96 w-96 rounded-full bg-brand-600/10 blur-[120px]" />
+        <div className="absolute -bottom-40 -left-40 h-96 w-96 rounded-full bg-brand-500/8 blur-[120px]" />
+      </div>
+
+      <div className="relative z-10 mx-auto flex max-w-[1600px] flex-col gap-4 px-4 py-4 lg:px-6">
+        <Navbar
+          user={user}
+          isConnected={isConnected}
+          onSearch={setSearchTerm}
+          onToggleSidebar={() => setSidebarOpen((v) => !v)}
+        />
+
+        <div className="flex gap-4 lg:gap-5">
+          {/* Mobile sidebar overlay */}
+          {sidebarOpen && (
+            <div className="fixed inset-0 z-40 bg-navy-950/80 backdrop-blur-sm lg:hidden" onClick={() => setSidebarOpen(false)} />
+          )}
+
+          {/* Sidebar */}
+          <div className={`
+            fixed inset-y-0 left-0 z-50 w-72 transform transition-transform duration-300 lg:static lg:z-auto lg:w-64 lg:translate-x-0 lg:flex-shrink-0
+            ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}
+          `}>
+            <Sidebar
+              currentFolder={folder}
+              unreadCount={unreadCount}
+              onSelect={handleSelectFolder}
+              onCompose={() => { setIsComposeOpen(true); setSidebarOpen(false); }}
+            />
+          </div>
+
+          {/* Mail list */}
+          <section className="w-full min-w-0 lg:w-80 lg:flex-shrink-0">
+            {loading ? (
+              <LoadingSpinner label="Loading mail" />
+            ) : (
+              <MailList entries={visibleEntries} currentEntry={currentEntry} onSelect={handleSelectEntry} />
+            )}
           </section>
-          <MailDetail entry={currentEntry} />
+
+          {/* Mail detail */}
+          <section className="hidden flex-1 lg:block">
+            <MailDetail entry={currentEntry} />
+          </section>
         </div>
       </div>
+
       <ComposeModal isOpen={isComposeOpen} onClose={() => setIsComposeOpen(false)} onSend={handleCompose} loading={loading} />
     </div>
   );

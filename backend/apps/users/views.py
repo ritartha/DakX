@@ -1,11 +1,15 @@
 from __future__ import annotations
 
+import re
+
 import pyotp
+from django.conf import settings
 from django.contrib.auth import authenticate
 from rest_framework import generics, permissions, response, status, views
 from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework_simplejwt.tokens import RefreshToken
 
+from .models import User
 from .repositories import UserRepository
 from .serializers import (
     ChangePasswordSerializer,
@@ -133,3 +137,30 @@ class Verify2FAView(views.APIView):
         request.user.is_2fa_enabled = True
         request.user.save(update_fields=['is_2fa_enabled'])
         return response.Response({'verified': True})
+
+
+class CheckAvailabilityView(views.APIView):
+    """Check if a desired mail ID (username) is available."""
+    permission_classes = [permissions.AllowAny]
+
+    def get(self, request):
+        username = (request.query_params.get('username') or '').strip().lower()
+        if not username:
+            return response.Response(
+                {'available': False, 'detail': 'Username is required.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        # Validate format: alphanumeric, dots, hyphens, underscores; 3-30 chars
+        if not re.match(r'^[a-z0-9][a-z0-9._-]{1,28}[a-z0-9]$', username):
+            return response.Response(
+                {'available': False, 'detail': 'Use 3-30 characters: letters, numbers, dots, hyphens, or underscores.'},
+                status=status.HTTP_200_OK,
+            )
+        domain = getattr(settings, 'DOMAIN', 'dakx.local')
+        email = f'{username}@{domain}'
+        exists = User.objects.filter(email__iexact=email).exists()
+        return response.Response({
+            'available': not exists,
+            'email': email,
+            'detail': 'Available!' if not exists else 'This mail ID is already taken.',
+        })

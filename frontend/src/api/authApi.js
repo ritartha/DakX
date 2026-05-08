@@ -8,3 +8,4 @@ export const getProfile = () => api.get('/users/profile/');
 export const updateProfile = (payload) => api.patch('/users/profile/', payload, {
   headers: { 'Content-Type': 'multipart/form-data' }
 });
+export const checkAvailability = (username) => api.get(`/users/check-availability/?username=${encodeURIComponent(username)}`);

@@ -11,19 +11,19 @@ Production-grade Gmail/Yahoo-like mail platform foundation.
                 +-----------+-----------+
                             |
                             v
-+--------------+   HTTP/WS  +-------------------+   async jobs   +----------------+
-|    Nginx     +----------->+ Django + DRF API  +--------------->+ Celery Worker  |
-| reverse proxy|            | Channels / ASGI   |                | Celery Beat    |
-+------+-------+            +----+---------+----+                +--------+-------+
-       |                         |         |                              |
-       |                         |         +------------------------------+
-       |                         |                     Redis              
-       |                         v                                           
-       |                  +--------------+            +----------------+
-       +----------------->+ PostgreSQL   |            | MinIO / S3     |
-                          | mail store   |            | attachments    |
-                          +--------------+            +----------------+
+                   HTTP/WS  +-------------------+
+                  --------->+ Django + DRF API  |
+                            | Channels / ASGI   |
+                            +----+---------+----+
+                                 |         |
+                                 v         v
+                          +-----------+  +-----------+
+                          | SQLite    |  | Local FS  |
+                          | (dev)     |  | media     |
+                          +-----------+  +-----------+
 ```
+
+> **Note:** For production, replace SQLite with PostgreSQL, add Redis for Celery/Channels, and use S3-compatible storage for attachments.
 
 ## ER Diagram
 
@@ -41,13 +41,70 @@ MailboxEntry (*) ---- (*) Label
 MailboxEntry (*) ---- (0..1) Folder
 ```
 
-## Quick Start
+## Quick Start (Local Development)
 
-1. Clone the repository.
-2. `cp .env.example .env`
-3. `make build`
-4. `make up`
-5. `make migrate`
+### Prerequisites
+
+- **Python 3.11+**
+- **Node.js 18+** and **npm**
+
+### 1. Clone & set up environment
+
+```bash
+git clone <repo-url>
+cd DakX
+
+# Create Python virtual environment
+python -m venv venv
+
+# Activate it
+# Windows:
+venv\Scripts\activate
+# macOS/Linux:
+source venv/bin/activate
+```
+
+### 2. Install dependencies
+
+```bash
+# Backend
+pip install -r backend/requirements.txt
+
+# Frontend
+cd frontend && npm install && cd ..
+```
+
+### 3. Configure environment
+
+```bash
+cp .env.example .env
+# Edit .env if you need to change any defaults
+```
+
+### 4. Set up database
+
+```bash
+cd backend
+python manage.py migrate
+python manage.py createsuperuser
+cd ..
+```
+
+### 5. Run the application
+
+Open **two terminals** (both with venv activated):
+
+```bash
+# Terminal 1 — Backend (port 8000)
+cd backend
+python manage.py runserver 8000
+
+# Terminal 2 — Frontend (port 3000)
+cd frontend
+npm run dev
+```
+
+Visit **http://localhost:3000** in your browser.
 
 ## API Endpoints
 
@@ -85,43 +142,33 @@ MailboxEntry (*) ---- (0..1) Folder
 
 ## Environment Variables
 
-| Variable | Purpose |
-| --- | --- |
-| `SECRET_KEY` | Django secret key |
-| `DEBUG` | Enable debug features |
-| `ALLOWED_HOSTS` | Allowed Django hosts |
-| `DOMAIN` | Public domain used in links and Message-ID generation |
-| `DATABASE_URL` | PostgreSQL connection string |
-| `REDIS_URL` | Redis URL for cache, channels, and Celery |
-| `AWS_ACCESS_KEY_ID` | MinIO / S3 access key |
-| `AWS_SECRET_ACCESS_KEY` | MinIO / S3 secret key |
-| `AWS_STORAGE_BUCKET_NAME` | Media bucket name |
-| `AWS_S3_ENDPOINT_URL` | S3-compatible endpoint |
-| `EMAIL_HOST` | SMTP host |
-| `EMAIL_PORT` | SMTP port |
-| `EMAIL_HOST_USER` | SMTP username |
-| `EMAIL_HOST_PASSWORD` | SMTP password |
-| `EMAIL_USE_TLS` | Enable TLS for SMTP |
-| `CELERY_BROKER_URL` | Redis broker URL |
-| `CELERY_RESULT_BACKEND` | Redis result backend |
-| `JWT_ACCESS_TOKEN_LIFETIME_MINUTES` | Access token TTL |
-| `JWT_REFRESH_TOKEN_LIFETIME_DAYS` | Refresh token TTL |
-| `CORS_ALLOWED_ORIGINS` | Trusted frontend origins |
+| Variable | Purpose | Required for Dev? |
+| --- | --- | --- |
+| `SECRET_KEY` | Django secret key | Yes (set any value) |
+| `DEBUG` | Enable debug features | Yes |
+| `DJANGO_SETTINGS_MODULE` | Settings module path | Yes |
+| `DATABASE_URL` | PostgreSQL connection string | No (SQLite default) |
+| `REDIS_URL` | Redis URL for cache, channels, Celery | No (in-memory default) |
+| `EMAIL_HOST` | SMTP host | No (console default) |
+| `JWT_ACCESS_TOKEN_LIFETIME_MINUTES` | Access token TTL | No |
+| `JWT_REFRESH_TOKEN_LIFETIME_DAYS` | Refresh token TTL | No |
+| `CORS_ALLOWED_ORIGINS` | Trusted frontend origins | No |
 
 ## Development Workflow
 
 - Use the service layer for mail and user business logic.
 - Keep views thin and repository access inside `repositories.py`.
-- Run `make makemigrations && make migrate` when models change.
-- Use `make test` for Django tests and `npm run build` for frontend smoke validation.
+- Run `cd backend && python manage.py makemigrations && python manage.py migrate` when models change.
+- Run `cd backend && python manage.py test` for Django tests.
+- Run `cd frontend && npm run build` for frontend smoke validation.
 
 ## Production Deployment Notes
 
-- Terminate TLS at Nginx or a cloud load balancer.
+- Use PostgreSQL, Redis, and S3-compatible storage in production.
 - Run Daphne behind Nginx for HTTP + WebSocket upgrade support.
-- Use managed PostgreSQL, Redis, and object storage in production.
 - Configure Celery worker autoscaling separately from web nodes.
 - Store secrets in a managed secret store instead of `.env` files.
+- Terminate TLS at Nginx or a cloud load balancer.
 
 ## Architecture Decisions
 

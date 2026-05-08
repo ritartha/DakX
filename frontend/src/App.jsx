@@ -6,6 +6,8 @@ import InboxPage from './pages/InboxPage';
 import LoginPage from './pages/LoginPage';
 import ProfilePage from './pages/ProfilePage';
 import RegisterPage from './pages/RegisterPage';
+import SettingsPage from './pages/SettingsPage';
+import NotFoundPage from './pages/NotFoundPage';
 
 function ProtectedRoute({ children }) {
   const isAuthenticated = useSelector((state) => state.auth.isAuthenticated);
@@ -27,6 +29,14 @@ export default function App() {
           }
         />
         <Route
+          path="/settings"
+          element={
+            <ProtectedRoute>
+              <SettingsPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
           path="/"
           element={
             <ProtectedRoute>
@@ -34,6 +44,7 @@ export default function App() {
             </ProtectedRoute>
           }
         />
+        <Route path="*" element={<NotFoundPage />} />
       </Routes>
     </ErrorBoundary>
   );
