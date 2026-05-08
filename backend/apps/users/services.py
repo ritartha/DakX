@@ -68,7 +68,9 @@ class UserService:
     def enable_2fa(user: User) -> str:
         secret = pyotp.random_base32()
         user.totp_secret = secret
-        user.is_2fa_enabled = False
-        user.save(update_fields=['totp_secret', 'is_2fa_enabled'])
+        # Only persist the new secret. is_2fa_enabled remains unchanged until
+        # the user confirms the code via Verify2FAView — do NOT set it False here,
+        # as that would disable 2FA for a user who already had it active.
+        user.save(update_fields=['totp_secret'])
         totp = pyotp.TOTP(secret)
         return totp.provisioning_uri(name=user.email, issuer_name='DakX')
